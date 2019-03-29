@@ -110,48 +110,6 @@ def explore_match(img1, img2, kp_pairs, status=None, H=None):
     return
 
 
-def match_and_draw():
-    print('matching...')
-    raw_matches = matcher.knnMatch(desc1, trainDescriptors=desc2, k=2)
-    p1, p2, kp_pairs = filter_matches(kp1, kp2, raw_matches)
-    if len(p1) >= 4:
-        H, status = cv2.findHomography(p1, p2, cv2.RANSAC, 5.0)
-        print('%d / %d  inliers/matched' % (np.sum(status), len(status)))
-    else:
-        H, status = None, None
-        print('%d matches found, not enough for homography estimation' % len(p1))
-
-    explore_match(img1, img2, kp_pairs, status, H)
-
-
-def epipolar_draw(img1, img2):
-    print('matching...')
-    raw_matches = matcher.knnMatch(desc1, trainDescriptors=desc2, k=2)
-    p1, p2, kp_pairs = filter_matches(kp1, kp2, raw_matches)
-
-    p1 = np.int32(p1)
-    p2 = np.int32(p2)
-    F, mask = cv2.findFundamentalMat(p1, p2, cv2.FM_LMEDS)
-
-    # We select only inlier points
-    p1 = p1[mask.ravel() == 1]
-    p2 = p2[mask.ravel() == 1]
-
-    # Find epilines corresponding to points in right image (second image) and
-    # drawing its lines on left image
-    l1 = cv2.computeCorrespondEpilines(p2.reshape(-1, 1, 2), 2, F)
-    l1 = l1.reshape(-1, 3)
-    img1_line, _ = drawlines(img1, img2, l1, p1, p2)
-
-    # Find epilines corresponding to points in left image (first image) and
-    # drawing its lines on right image
-    l2 = cv2.computeCorrespondEpilines(p1.reshape(-1, 1, 2), 1, F)
-    l2 = l2.reshape(-1, 3)
-    img2_line, _ = drawlines(img2, img1, l2, p2, p1)
-    frame = cv2.hconcat([img1_line, img2_line])
-    cv2.imwrite('epipole.png', frame)
-
-
 def drawlines(img1, img2, lines, pts1, pts2):
     ''' img1 - image on which we draw the epilines for the points in img2
         lines - corresponding epilines '''
@@ -199,11 +157,54 @@ if __name__ == '__main__':
 
     print('using', feature_name)
 
+    # 特徴点の抽出
     kp1, desc1 = detector.detectAndCompute(img1, None)
     kp2, desc2 = detector.detectAndCompute(img2, None)
     print('img1 - %d features, img2 - %d features' % (len(kp1), len(kp2)))
 
-    # match_and_draw()
-    epipolar_draw(img1, img2)
+    print('matching...')
+    # 特徴点のマッチング
+    # 各特徴点に対する上位2つの点を返す
+    raw_matches = matcher.knnMatch(desc1, trainDescriptors=desc2, k=2)
+    p1, p2, kp_pairs = filter_matches(kp1, kp2, raw_matches)
+    if len(p1) >= 4:
+        # ホモグラフィ行列とマスク
+        H, status = cv2.findHomography(p1, p2, cv2.RANSAC, 5.0)
+        print('%d / %d  inliers/matched' % (np.sum(status), len(status)))
+    else:
+        H, status = None, None
+        print('%d matches found, not enough for homography estimation' % len(p1))
+
+    # 特徴点のマッチング
+    explore_match(img1, img2, kp_pairs, status, H)
+
+    # Fundamental Matrixを計算
+    p1 = np.int32(p1)
+    p2 = np.int32(p2)
+    F, mask = cv2.findFundamentalMat(p1, p2, cv2.FM_LMEDS)
+
+    # We select only inlier points
+    # インライアの特徴点を抽出
+    p1 = p1[mask.ravel() == 1]
+    p2 = p2[mask.ravel() == 1]
+
+    # Find epilines corresponding to points in right image (second image) and
+    # drawing its lines on left image
+    # 画像2上の特徴点に対応するエピポーラを画像1上に描画する
+    l1 = cv2.computeCorrespondEpilines(p2.reshape(-1, 1, 2), 2, F)
+    l1 = l1.reshape(-1, 3)
+    img1_line, _ = drawlines(img1, img2, l1, p1, p2)
+
+    # Find epilines corresponding to points in left image (first image) and
+    # drawing its lines on right image
+    # 画像2上の特徴点に対応するエピポーラを画像1上に描画する
+    l2 = cv2.computeCorrespondEpilines(p1.reshape(-1, 1, 2), 1, F)
+    l2 = l2.reshape(-1, 3)
+    img2_line, _ = drawlines(img2, img1, l2, p2, p1)
+
+    # エピポーラも合わせた画像の表示
+    frame = cv2.hconcat([img1_line, img2_line])
+    cv2.imwrite('epipole.png', frame)
+
     cv2.waitKey()
     cv2.destroyAllWindows()
