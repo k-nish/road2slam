@@ -34,7 +34,7 @@ def init_feature(name):
         detector = cv2.xfeatures2d.SURF_create(800)
         norm = cv2.NORM_L2
     elif chunks[0] == 'orb':
-        detector = cv2.ORB_create(400)
+        detector = cv2.ORB_create(800)
         norm = cv2.NORM_HAMMING
     elif chunks[0] == 'akaze':
         detector = cv2.AKAZE_create()
@@ -157,7 +157,7 @@ if __name__ == '__main__':
 
     print('using', feature_name)
 
-    # 特徴点の抽出
+    # 特徴点と特徴ベクトルの抽出
     kp1, desc1 = detector.detectAndCompute(img1, None)
     kp2, desc2 = detector.detectAndCompute(img2, None)
     print('img1 - %d features, img2 - %d features' % (len(kp1), len(kp2)))
@@ -175,7 +175,7 @@ if __name__ == '__main__':
         H, status = None, None
         print('%d matches found, not enough for homography estimation' % len(p1))
 
-    # 特徴点のマッチング
+    # マッチングした特徴点を描画
     explore_match(img1, img2, kp_pairs, status, H)
 
     # Fundamental Matrixを計算
